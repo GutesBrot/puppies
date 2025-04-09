@@ -4,10 +4,10 @@ import requests
 from bs4 import BeautifulSoup
 import azure.functions as func
 from datetime import datetime
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+import smtplib
+from email.message import EmailMessage
 
-# Create your Function App instance
+# Create your Function App instance using the new programming model
 app = func.FunctionApp()
 
 # Define a list of websites and the expected text for each.
@@ -17,23 +17,16 @@ WEBSITES = [
         "url": "https://www.goldenharmony.ch/zucht/wurfplanung",
         "expected_text": ("Aktuell ist kein Wurf geplant. Daher nehmen wir auch keine Anfragen entgegen. "
                           "Wir bitten um Verständnis."),
-        # A CSS selector, or use a combination of tag and class for BeautifulSoup.
+        # CSS selector for the element containing the text
         "selector": {"tag": "h2", "class": "uk-h2 uk-text-warning"}
     },
-    # You can add more website dictionaries here
-    # {
-    #     "name": "Other Website Name",
-    #     "url": "https://example.com/somepage",
-    #     "expected_text": "Expected content goes here.",
-    #     "selector": {"tag": "div", "class": "some-class"}
-    # } 0 0 9 * * *
+    # Add additional website dictionaries here if needed.
 ]
 
 @app.function_name(name="CheckPuppies")
-@app.timer_trigger(schedule="0 */2 * * * *", arg_name="mytimer", run_on_startup=True)
+@app.timer_trigger(schedule="0 0 9 * * *", arg_name="mytimer", run_on_startup=True)
 def check_websites(mytimer: func.TimerRequest) -> None:
     logging.info(f"CheckWebsites function started at {datetime.utcnow()}")
-
     changes = []  # Collect changes for sites that have updated
 
     for site in WEBSITES:
@@ -67,7 +60,6 @@ def check_websites(mytimer: func.TimerRequest) -> None:
             changes.append(f"{site['name']} ({url}) - Target element not found.")
 
     if changes:
-        # Compose an email body including the URL(s) and details of the changes.
         email_body = "The following websites have changed:\n\n" + "\n\n".join(changes)
         send_email_notification("Puppies might be available", email_body)
     else:
@@ -75,35 +67,40 @@ def check_websites(mytimer: func.TimerRequest) -> None:
 
 def send_email_notification(subject: str, body: str) -> None:
     """
-    Send an email using Twilio SendGrid.
-    Ensure these environment variables are set:
-      - SENDGRID_API_KEY
-      - SENDER_EMAIL
-      - RECEIVER_EMAIL
+    Send an email using Brevo's SMTP relay.
+    Credentials and SMTP settings are read from environment variables.
     """
-    sendgrid_api_key = os.environ.get("SENDGRID_API_KEY")
-    sender_email = os.environ.get("SENDER_EMAIL")
+    # Retrieve SMTP settings from environment variables or use defaults
+    smtp_server = os.environ.get("SMTP_SERVER", "smtp-relay.brevo.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_username = os.environ.get("SMTP_USERNAME", "89f727001@smtp-brevo.com")
+    smtp_password = os.environ.get("SMTP_PASSWORD", "MhNGDF9AHd8avKsP")
+    
+    # Get sender and receiver email addresses from environment variables.
+    sender_email = os.environ.get("SENDER_EMAIL", smtp_username)
     receiver_email = os.environ.get("RECEIVER_EMAIL")
-
-    if not all([sendgrid_api_key, sender_email, receiver_email]):
-        logging.error("SendGrid email configuration is missing. Check your environment variables.")
+    
+    if not receiver_email:
+        logging.error("Receiver email is not set in the environment variables.")
         return
-
-    message = Mail(
-        from_email=sender_email,
-        to_emails=receiver_email,
-        subject=subject,
-        html_content=body
-    )
-
+    
+    # Create email message
+    msg = EmailMessage()
+    msg['Subject'] = subject
+    msg['From'] = sender_email
+    msg['To'] = receiver_email
+    msg.set_content(body)
+    
     try:
-        sg = SendGridAPIClient(sendgrid_api_key)
-        response = sg.send(message)
-        logging.info(f"Email sent successfully. Status Code: {response.status_code}")
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()  # Secure the connection with TLS
+            server.login(smtp_username, smtp_password)
+            server.send_message(msg)
+        logging.info("Notification email sent successfully using Brevo SMTP.")
     except Exception as e:
-        logging.error(f"Error sending email via SendGrid: {e}")
+        logging.error(f"Error sending email via Brevo SMTP: {e}")
 
-# # Add an HTTP trigger function for testing
+# Uncomment the following HTTP trigger function for testing purposes if needed.
 # @app.function_name(name="HttpTest")
 # @app.http_trigger(methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS, route="test")
 # def http_test(req: func.HttpRequest) -> func.HttpResponse:
