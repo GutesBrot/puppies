@@ -102,3 +102,10 @@ def send_email_notification(subject: str, body: str) -> None:
         logging.info(f"Email sent successfully. Status Code: {response.status_code}")
     except Exception as e:
         logging.error(f"Error sending email via SendGrid: {e}")
+
+# Add an HTTP trigger function for testing
+@app.function_name(name="HttpTest")
+@app.http_trigger(methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS, route="test")
+def http_test(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info(f"HTTP trigger function called at {datetime.utcnow()}")
+    return func.HttpResponse("HTTP trigger test successful", status_code=200)
