@@ -11,7 +11,6 @@ from sendgrid.helpers.mail import Mail
 app = func.FunctionApp()
 
 # Define a list of websites and the expected text for each.
-# You can easily extend this list to include additional websites.
 WEBSITES = [
     {
         "name": "Golden Harmony Wurfplanung",
