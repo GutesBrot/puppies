@@ -26,11 +26,11 @@ WEBSITES = [
     #     "url": "https://example.com/somepage",
     #     "expected_text": "Expected content goes here.",
     #     "selector": {"tag": "div", "class": "some-class"}
-    # }
+    # } 0 0 9 * * *
 ]
 
 @app.function_name(name="CheckPuppies")
-@app.timer_trigger(schedule="0 0 9 * * *", arg_name="mytimer", run_on_startup=True)
+@app.timer_trigger(schedule="0 */2 * * * *", arg_name="mytimer", run_on_startup=True)
 def check_websites(mytimer: func.TimerRequest) -> None:
     logging.info(f"CheckWebsites function started at {datetime.utcnow()}")
 
