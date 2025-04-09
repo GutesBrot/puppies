@@ -35,6 +35,7 @@ jobs:
           source venv/bin/activate
 
       - name: Install dependencies
+        working-directory: PuppyMonitorFunctionProj
         run: pip install -r requirements.txt
 
       # Optional: Add step to run tests here
